@@ -2,6 +2,7 @@
 
 namespace Vyuldashev\NovaMoneyField;
 
+use Illuminate\Support\Facades\Config;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Money\Currencies\AggregateCurrencies;
@@ -20,6 +21,8 @@ class Money extends Number
 
     public $inMinorUnits;
 
+    public $inline;
+
     public function __construct($name, $currency = 'USD', $attribute = null, $resolveCallback = null)
     {
         parent::__construct($name, $attribute, $resolveCallback);
@@ -27,6 +30,7 @@ class Money extends Number
         $this->withMeta([
             'currency' => $currency,
             'subUnits' => $this->subunits($currency),
+            'inline' => $this->inline
         ]);
 
         $this->step(1 / $this->minorUnit($currency));
@@ -50,12 +54,38 @@ class Money extends Number
             });
     }
 
+    protected function resolveAttribute($resource, $attribute)
+    {
+        $this->setResourceId(data_get($resource, $resource->getKeyName()));
+
+        return parent::resolveAttribute($resource, $attribute);
+    }
+
+    protected function setResourceId($id)
+    {
+        return $this->withMeta([
+            'id' => $id,
+            'nova_path' => Config::get('nova.path'),
+            'in_minor_units' => $this->inMinorUnits
+        ]);
+    }
+
     /**
      * The value in database is store in minor units (cents for dollars).
      */
     public function storedInMinorUnits()
     {
         $this->inMinorUnits = true;
+
+        return $this;
+    }
+
+    /**
+     * Enable inline editing (on index field)
+     */
+    public function inline($updatedMessage = null)
+    {
+        $this->withMeta(['inline' => true, 'message' => $updatedMessage]);
 
         return $this;
     }
